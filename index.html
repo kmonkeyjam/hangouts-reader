@@ -91,6 +91,7 @@ You can view the source code <a href="https://github.com/Jessecar96/hangouts-rea
 	var Hangouts      = {}; // Main object for raw hangouts data
 	var Conversations = {};
 	var all_participants = {};
+	var start_timestamp = 1451621713000; // Don't show messages before this timestamp (in ms)
 
 	$(document).on('change', '.btn-file :file', function() {
 		var input    = $(this),
@@ -162,9 +163,6 @@ You can view the source code <a href="https://github.com/Jessecar96/hangouts-rea
 			}
 			var participants_string = participants.join(", ");
 
-			// Add to list
-			$(".convo-list").append("<a href=\"javascript:void(0);\" onclick=\"switchConvo('"+id+"')\" class=\"list-group-item\">" + participants_string + "</a>");
-
 			// Parse events
 			var events = [];
 			for(event_key in conversation_state['conversation_state']['event']){
@@ -187,14 +185,16 @@ You can view the source code <a href="https://github.com/Jessecar96/hangouts-rea
 					if(convo_event['chat_message']['message_content']['attachment']){
 						for(var attach_key in convo_event['chat_message']['message_content']['attachment']){
 							var attachment = convo_event['chat_message']['message_content']['attachment'][attach_key];
-							console.log(attachment);
+							// console.log(attachment);
 							if(attachment['embed_item']['type'][0] == "PLUS_PHOTO"){
 								message += "\n<a target='blank' href='" + attachment['embed_item']['embeds.PlusPhoto.plus_photo']['url'] + "'><img class='thumb' src='" + attachment['embed_item']['embeds.PlusPhoto.plus_photo']['thumbnail']['image_url'] + "' /></a>";
 							}
 						}
 					}
 
-					events.push({msgtime: msgtime, sender: participants_obj[sender], message: message, timestamp: timestamp});
+          if (timestamp / 1000 > start_timestamp) {
+            events.push({msgtime: msgtime, sender: participants_obj[sender], message: message, timestamp: timestamp});
+					}
 				}
 			}
 
@@ -208,15 +208,30 @@ You can view the source code <a href="https://github.com/Jessecar96/hangouts-rea
 			});
 
 			// Add events
-			Conversations[id] = events;
-
+			if (events.length > 0) {
+        Conversations[id] = {
+          events: events,
+					participants: participants_string
+        };
+			}
 		}
+
+    var conversation_participants = Object.keys(Conversations).sort(function(a, b) {
+      var keyA = Conversations[a].events.length,
+          keyB = Conversations[b].events.length;
+      if(keyA < keyB) return 1;
+      if(keyA > keyB) return -1;
+      return 0;
+    }).forEach(function(id) {
+      // Add to list
+      $(".convo-list").append("<a href=\"javascript:void(0);\" onclick=\"switchConvo('"+id+"')\" class=\"list-group-item\">" + Conversations[id].participants + "</a>");
+    });
 	}
 
 	function switchConvo(id){
 		$('.txt').text('');
-		for(var event_id in Conversations[id]){
-			var convo_event = Conversations[id][event_id];
+		for(var event_id in Conversations[id].events){
+			var convo_event = Conversations[id].events[event_id];
 			$('.txt').append(convo_event.msgtime + ": " + convo_event.sender + ": " + convo_event.message + "\n");
 		}
 	}
